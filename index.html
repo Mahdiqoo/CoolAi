@@ -736,29 +736,20 @@ Behavior rules:
 - Never fabricate features not listed above`,
 
             // ── Main send handler ──────────────────────────────────────
-			async sendMessage() {
-				const text = this.userInput.trim();
-				if (!text || this.isLoading) return;
+            async sendMessage() {
+                const text = this.userInput.trim();
+                if (!text || this.isLoading) return;
 
-				this.messages.push({ role: 'user', content: text });
-				this.userInput = '';
-				this.isLoading = true;
-				this.statusText = 'Thinking…';
-				this.$nextTick(() => this.scrollToBottom());
+                this.messages.push({ role: 'user', content: text });
+                this.userInput = '';
+                this.isLoading = true;
+                this.statusText = 'Thinking…';
+                this.$nextTick(() => this.scrollToBottom());
 
-				let reply = null;
+                let reply = null;
 
-				// Fast path: handle simple acks locally, no API call needed
-				const acks = ['ok', 'okay', 'thanks', 'thank you', 'got it', 'sure', 'cool',
-							  'great', 'nice', 'alright', 'perfect', 'awesome', 'good', 'noted'];
-				const q = text.toLowerCase().trim();
-				if (acks.some(a => q === a || q === a + '!' || q === a + '.')) {
-					reply = "You're welcome! Feel free to ask anything else about CoolAI Engine — its speed, accuracy, integration options, or how to get access.";
-				}
-
-				if (!reply) {
-					// Strategy 1: Pollinations POST (OpenAI-compatible)
-					reply = await this.tryPollinationsPost();
+                // Strategy 1: Pollinations POST (OpenAI-compatible)
+                reply = await this.tryPollinationsPost();
 
                 // Strategy 2: Pollinations GET (simpler, CORS-friendly)
                 if (!reply) {
@@ -770,10 +761,10 @@ Behavior rules:
                     reply = await this.tryHuggingFace(text);
                 }
 
-				// Final fallback: helpful static response
-				if (!reply) {
-					reply = this.buildFallbackReply(text);
-				}
+                // Final fallback: helpful static response
+                if (!reply) {
+                    reply = this.buildFallbackReply(text);
+                }
 
                 this.messages.push({ role: 'assistant', content: reply });
                 this.isLoading = false;
@@ -793,7 +784,7 @@ Behavior rules:
 						body: JSON.stringify({
 							messages: [
 								{ role: 'system', content: this.SYSTEM_PROMPT },
-								...this.messages.slice(-8)
+								...this.messages
 							],
 							model: 'openai',
 							private: true,
@@ -890,42 +881,28 @@ Behavior rules:
                 }
             },
 
-			// ── Fallback: keyword-based static replies ─────────────────
-			buildFallbackReply(text) {
-				const q = text.toLowerCase().trim();
+            // ── Fallback: keyword-based static replies ─────────────────
+            buildFallbackReply(text) {
+                const q = text.toLowerCase();
 
-				// Handle simple acknowledgements without calling the API
-				const acks = ['ok', 'okay', 'thanks', 'thank you', 'got it', 'sure', 'cool',
-							  'great', 'nice', 'alright', 'perfect', 'awesome', 'good', 'noted'];
-				if (acks.some(a => q === a || q === a + '!' || q === a + '.')) {
-					return "You're welcome! Feel free to ask anything else about CoolAI Engine — its speed, accuracy, integration options, or how to get access.";
-				}
+                if (q.includes('speed') || q.includes('fast') || q.includes('coolprop') || q.includes('144')) {
+                    return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step). This makes it ideal for real-time digital twins and optimization loops.';
+                }
+                if (q.includes('accur') || q.includes('mape') || q.includes('r2') || q.includes('fidelit')) {
+                    return 'CoolAI maintains exceptional physical accuracy: average MAPE below 0.05%, R² fit exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep.';
+                }
+                if (q.includes('access') || q.includes('license') || q.includes('download') || q.includes('get')) {
+                    return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You can receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and the grid training pipelines.';
+                }
+                if (q.includes('python') || q.includes('c++') || q.includes('integrat') || q.includes('batch')) {
+                    return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer you get to the peak speedup. Contact Arthourias@gmail.com for library packages.';
+                }
+                if (q.includes('what is') || q.includes('coolai') || q.includes('project')) {
+                    return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 144× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
+                }
 
-				// Ownership / contact / author questions — check BEFORE generic "project" catch-all
-				if (q.includes('who') || q.includes('own') || q.includes('author') ||
-					q.includes('creat') || q.includes('develop') || q.includes('contact')) {
-					return 'CoolAI Engine was developed by the researcher behind this academic portfolio. For access, licensing, or collaboration inquiries, reach out directly at Arthourias@gmail.com — please mention your academic affiliation or corporate context.';
-				}
-
-				if (q.includes('speed') || q.includes('fast') || q.includes('coolprop') || q.includes('144')) {
-					return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step). This makes it ideal for real-time digital twins and optimization loops.';
-				}
-				if (q.includes('accur') || q.includes('mape') || q.includes('r2') || q.includes('fidelit')) {
-					return 'CoolAI maintains exceptional physical accuracy: average MAPE below 0.05%, R² fit exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep.';
-				}
-				if (q.includes('access') || q.includes('license') || q.includes('download') || q.includes('get')) {
-					return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You can receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and the grid training pipelines.';
-				}
-				if (q.includes('python') || q.includes('c++') || q.includes('integrat') || q.includes('batch')) {
-					return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer you get to the peak speedup. Contact Arthourias@gmail.com for library packages.';
-				}
-				// More specific match — only trigger on explicit CoolAI/what-is questions
-				if (q.includes('coolai') || (q.includes('what') && q.includes('project'))) {
-					return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 144× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
-				}
-
-				return 'I\'m having trouble connecting to the AI service right now. For questions about CoolAI Engine — its 144x speedup, accuracy metrics, or how to get access — please email Arthourias@gmail.com directly. You can also explore the performance metrics on this page above.';
-			},
+                return 'I\'m having trouble connecting to the AI service right now. For questions about CoolAI Engine — its 144x speedup, accuracy metrics, or how to get access — please email Arthourias@gmail.com directly. You can also explore the performance metrics on this page above.';
+            },
 
             // ── Helpers ────────────────────────────────────────────────
             sendQuickMessage(text) {
