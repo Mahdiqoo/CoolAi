@@ -13,7 +13,7 @@
     <!-- AlpineJS for Interactive States -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -504,10 +504,14 @@
         </div>
     </footer>
 
-    <!-- Run Lucide Icons -->
-    <script>
-        lucide.createIcons();
-    </script>
+	<!-- Run Lucide Icons -->
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			if (typeof lucide !== 'undefined') {
+				lucide.createIcons();
+			}
+		});
+	</script>
 
     <!-- ============================================ -->
     <!--  AI Chatbot Widget                           -->
@@ -768,36 +772,38 @@ Behavior rules:
                 this.$nextTick(() => this.scrollToBottom());
             },
 
-            // ── Strategy 1: Pollinations POST ─────────────────────────
-            async tryPollinationsPost() {
-                try {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 12000);
+			// ── Strategy 1: Pollinations POST (OpenAI-compatible) ─────
+			async tryPollinationsPost() {
+				try {
+					const controller = new AbortController();
+					const timer = setTimeout(() => controller.abort(), 15000);
 
-                    const res = await fetch('https://text.pollinations.ai/', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            messages: [
-                                { role: 'system', content: this.SYSTEM_PROMPT },
-                                ...this.messages
-                            ],
-                            model: 'openai',
-                            private: true,
-                            seed: Math.floor(Math.random() * 99999)
-                        }),
-                        signal: controller.signal
-                    });
+					const res = await fetch('https://text.pollinations.ai/openai', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							messages: [
+								{ role: 'system', content: this.SYSTEM_PROMPT },
+								...this.messages
+							],
+							model: 'openai',
+							private: true,
+							seed: Math.floor(Math.random() * 99999)
+						}),
+						signal: controller.signal
+					});
 
-                    clearTimeout(timer);
-                    if (!res.ok) return null;
+					clearTimeout(timer);
+					if (!res.ok) return null;
 
-                    const text = (await res.text()).trim();
-                    return text.length > 5 ? text : null;
-                } catch {
-                    return null;
-                }
-            },
+					// /openai returns JSON in OpenAI format, not plain text
+					const data = await res.json();
+					const text = data?.choices?.[0]?.message?.content?.trim();
+					return text && text.length > 5 ? text : null;
+				} catch {
+					return null;
+				}
+			},
 
             // ── Strategy 2: Pollinations GET ──────────────────────────
             async tryPollinationsGet(lastUserMsg) {
