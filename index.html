@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
     <!-- AlpineJS for Interactive States -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
@@ -749,47 +749,60 @@ KEY FACTS YOU MUST KNOW:
 - If someone asks how to get access, tell them to email Arthourias@gmail.com
 - Never make up features or capabilities that are not listed above`,
 
-            async sendMessage() {
-                const text = this.userInput.trim();
-                if (!text || this.isLoading) return;
+			async sendMessage() {
+				const text = this.userInput.trim();
+				if (!text || this.isLoading) return;
 
-                this.messages.push({ role: 'user', content: text });
-                this.userInput = '';
-                this.isLoading = true;
+				this.messages.push({ role: 'user', content: text });
+				this.userInput = '';
+				this.isLoading = true;
+				this.$nextTick(() => this.scrollToBottom());
 
-                this.$nextTick(() => this.scrollToBottom());
+				try {
+					const apiMessages = [
+						{ role: 'system', content: this.SYSTEM_PROMPT },
+						...this.messages
+					];
 
-                try {
-                    const apiMessages = [
-                        { role: 'system', content: this.SYSTEM_PROMPT },
-                        ...this.messages
-                    ];
+					const controller = new AbortController();
+					const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-                    const response = await fetch('https://text.pollinations.ai/', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            messages: apiMessages,
-                            model: 'openai',
-                            seed: Math.floor(Math.random() * 10000)
-                        })
-                    });
+					const response = await fetch('https://text.pollinations.ai/', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							messages: apiMessages,
+							model: 'openai',
+							seed: Math.floor(Math.random() * 10000)
+						}),
+						signal: controller.signal
+					});
 
-                    if (!response.ok) throw new Error('API request failed');
+					clearTimeout(timeoutId);
 
-                    const aiReply = await response.text();
-                    this.messages.push({ role: 'assistant', content: aiReply.trim() });
-                } catch (error) {
-                    console.error('Chatbot error:', error);
-                    this.messages.push({
-                        role: 'assistant',
-                        content: 'Sorry, I encountered an error connecting to the AI service. Please try again in a moment.'
-                    });
-                } finally {
-                    this.isLoading = false;
-                    this.$nextTick(() => this.scrollToBottom());
-                }
-            },
+					if (!response.ok) {
+						throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+					}
+
+					const aiReply = await response.text();
+					this.messages.push({ role: 'assistant', content: aiReply.trim() });
+				} catch (error) {
+					console.error('Chatbot error:', error);
+					
+					// User-friendly error messages
+					let errorMsg = 'Sorry, I encountered an error. Please try again.';
+					if (error.name === 'TypeError' && error.message.includes('fetch')) {
+						errorMsg = 'Connection blocked. This may be caused by an ad blocker or CORS policy. Please disable ad blockers for this site or try a different browser.';
+					} else if (error.name === 'AbortError') {
+						errorMsg = 'Request timed out. The AI service may be busy. Please try again.';
+					}
+					
+					this.messages.push({ role: 'assistant', content: errorMsg });
+				} finally {
+					this.isLoading = false;
+					this.$nextTick(() => this.scrollToBottom());
+				}
+			},
 
             sendQuickMessage(text) {
                 this.userInput = text;
