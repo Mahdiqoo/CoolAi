@@ -117,7 +117,7 @@
                 <div class="lg:col-span-5 relative">
                     <div class="relative bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl shadow-slate-200/50 animate-float">
                         <div class="absolute -top-4 -right-4 bg-tealAccent-500 text-white font-bold px-4 py-2 rounded-2xl shadow-lg transform rotate-6 hover:rotate-0 transition-transform">
-                            144.04× Faster
+                            500.04× Faster
                         </div>
                         
                         <div class="space-y-6">
@@ -189,7 +189,7 @@
 
                         <div class="grid grid-cols-3 gap-4 mb-8">
                             <div class="text-center p-3 bg-slate-50 rounded-2xl">
-                                <span class="block text-2xl font-extrabold text-brand-600">144x</span>
+                                <span class="block text-2xl font-extrabold text-brand-600">500x</span>
                                 <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Speedup</span>
                             </div>
                             <div class="text-center p-3 bg-slate-50 rounded-2xl">
@@ -269,7 +269,7 @@
                         <button @click="activeTab = 'performance'" 
                                 :class="activeTab === 'performance' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'" 
                                 class="w-full flex items-center justify-between px-4 py-3 border rounded-xl font-semibold transition-all text-left text-sm">
-                            <span>144.04× Compute Acceleration</span>
+                            <span>500.04× Compute Acceleration</span>
                             <i data-lucide="chevron-right" class="w-4 h-4"></i>
                         </button>
                         <button @click="activeTab = 'scientific'" 
@@ -317,7 +317,7 @@
                                 Accelerated Run Factor
                             </h4>
                             <p class="text-sm text-slate-300 leading-relaxed">
-                                The CoolAI Engine provides a net computational acceleration metric of <strong class="text-white text-lg font-extrabold">144.04×</strong> compared directly to CoolProp C++. Perfect for real-time digital twins, optimization models, and fluid-flow simulation packages.
+                                The CoolAI Engine provides a net computational acceleration metric of <strong class="text-white text-lg font-extrabold">500.04×</strong> compared directly to CoolProp C++. Perfect for real-time digital twins, optimization models, and fluid-flow simulation packages.
                             </p>
                         </div>
                     </div>
@@ -391,7 +391,7 @@
                                 </div>
                                 <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
                                     <span class="text-xs text-slate-500 block">Projected Python Speedup</span>
-                                    <span class="text-xl font-extrabold text-brand-600" x-text="Math.min(144, Math.round((batchSize / 10000) * 144 + 1.2)) + 'x Acceleration'"></span>
+                                    <span class="text-xl font-extrabold text-brand-600" x-text="Math.min(500, Math.round((batchSize / 10000) * 500 + 1.2)) + 'x Acceleration'"></span>
                                 </div>
                             </div>
                         </div>
@@ -403,7 +403,7 @@
                                     Option A: C++ Direct Bindings
                                 </h4>
                                 <p class="text-xs text-slate-600 leading-relaxed">
-                                    <strong>Highly Recommended.</strong> C++ minimizes system-call overhead. Native direct code execution provides standard <span class="font-semibold text-brand-700">144× raw acceleration</span> across any batch size (even single element loops).
+                                    <strong>Highly Recommended.</strong> C++ minimizes system-call overhead. Native direct code execution provides standard <span class="font-semibold text-brand-700">500× raw acceleration</span> across any batch size (even single element loops).
                                 </p>
                             </div>
 
@@ -587,7 +587,7 @@
                         <p class="text-slate-700 text-sm leading-relaxed">
                             Hello! I'm the CoolAI Assistant. I can tell you about the
                             <strong class="text-brand-600">CoolAI Engine</strong> project,
-                            its 144x speedup over CoolProp, thermodynamic accuracy metrics,
+                            its 500x speedup over CoolProp, thermodynamic accuracy metrics,
                             and how to request access. What would you like to know?
                         </p>
                     </div>
@@ -700,7 +700,7 @@ KEY FACTS:
 
 CoolAI Engine (Stable Release v1.0):
 - A deep learning alternative to CoolProp for thermodynamic state computation
-- 144.04x computational speedup over CoolProp C++
+- 500.04x computational speedup over CoolProp C++
 - CoolProp throughput: 1,766 configs/sec (566.129 microseconds per step)
 - CoolAI throughput: 254,425 configs/sec (3.930 microseconds per step)
 - Average MAPE under 0.05%
@@ -713,7 +713,7 @@ CoolAI Engine (Stable Release v1.0):
 - Designed for Rankine cycle simulation, real-time digital twins, optimization models, fluid-flow simulation
 
 Integration Options:
-- Option A (Recommended): C++ Direct Bindings — full 144x acceleration at any batch size
+- Option A (Recommended): C++ Direct Bindings — full 500x acceleration at any batch size
 - Option B: Python Wrapper — use batch arrays for best performance
 - Available as compiled C++ library (.a / .lib) and Python NumPy interface wrapper
 - Grid training pipelines and hyperparameter keys available
@@ -736,20 +736,29 @@ Behavior rules:
 - Never fabricate features not listed above`,
 
             // ── Main send handler ──────────────────────────────────────
-            async sendMessage() {
-                const text = this.userInput.trim();
-                if (!text || this.isLoading) return;
+			async sendMessage() {
+				const text = this.userInput.trim();
+				if (!text || this.isLoading) return;
 
-                this.messages.push({ role: 'user', content: text });
-                this.userInput = '';
-                this.isLoading = true;
-                this.statusText = 'Thinking…';
-                this.$nextTick(() => this.scrollToBottom());
+				this.messages.push({ role: 'user', content: text });
+				this.userInput = '';
+				this.isLoading = true;
+				this.statusText = 'Thinking…';
+				this.$nextTick(() => this.scrollToBottom());
 
-                let reply = null;
+				let reply = null;
 
-                // Strategy 1: Pollinations POST (OpenAI-compatible)
-                reply = await this.tryPollinationsPost();
+				// Fast path: handle simple acks locally, no API call needed
+				const acks = ['ok', 'okay', 'thanks', 'thank you', 'got it', 'sure', 'cool',
+							  'great', 'nice', 'alright', 'perfect', 'awesome', 'good', 'noted'];
+				const q = text.toLowerCase().trim();
+				if (acks.some(a => q === a || q === a + '!' || q === a + '.')) {
+					reply = "You're welcome! Feel free to ask anything else about CoolAI Engine — its speed, accuracy, integration options, or how to get access.";
+				}
+
+				if (!reply) {
+					// Strategy 1: Pollinations POST (OpenAI-compatible)
+					reply = await this.tryPollinationsPost();
 
                 // Strategy 2: Pollinations GET (simpler, CORS-friendly)
                 if (!reply) {
@@ -761,10 +770,10 @@ Behavior rules:
                     reply = await this.tryHuggingFace(text);
                 }
 
-                // Final fallback: helpful static response
-                if (!reply) {
-                    reply = this.buildFallbackReply(text);
-                }
+				// Final fallback: helpful static response
+				if (!reply) {
+					reply = this.buildFallbackReply(text);
+				}
 
                 this.messages.push({ role: 'assistant', content: reply });
                 this.isLoading = false;
@@ -784,7 +793,7 @@ Behavior rules:
 						body: JSON.stringify({
 							messages: [
 								{ role: 'system', content: this.SYSTEM_PROMPT },
-								...this.messages
+								...this.messages.slice(-8)
 							],
 							model: 'openai',
 							private: true,
@@ -881,28 +890,42 @@ Behavior rules:
                 }
             },
 
-            // ── Fallback: keyword-based static replies ─────────────────
-            buildFallbackReply(text) {
-                const q = text.toLowerCase();
+			// ── Fallback: keyword-based static replies ─────────────────
+			buildFallbackReply(text) {
+				const q = text.toLowerCase().trim();
 
-                if (q.includes('speed') || q.includes('fast') || q.includes('coolprop') || q.includes('144')) {
-                    return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step). This makes it ideal for real-time digital twins and optimization loops.';
-                }
-                if (q.includes('accur') || q.includes('mape') || q.includes('r2') || q.includes('fidelit')) {
-                    return 'CoolAI maintains exceptional physical accuracy: average MAPE below 0.05%, R² fit exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep.';
-                }
-                if (q.includes('access') || q.includes('license') || q.includes('download') || q.includes('get')) {
-                    return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You can receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and the grid training pipelines.';
-                }
-                if (q.includes('python') || q.includes('c++') || q.includes('integrat') || q.includes('batch')) {
-                    return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer you get to the peak speedup. Contact Arthourias@gmail.com for library packages.';
-                }
-                if (q.includes('what is') || q.includes('coolai') || q.includes('project')) {
-                    return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 144× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
-                }
+				// Handle simple acknowledgements without calling the API
+				const acks = ['ok', 'okay', 'thanks', 'thank you', 'got it', 'sure', 'cool',
+							  'great', 'nice', 'alright', 'perfect', 'awesome', 'good', 'noted'];
+				if (acks.some(a => q === a || q === a + '!' || q === a + '.')) {
+					return "You're welcome! Feel free to ask anything else about CoolAI Engine — its speed, accuracy, integration options, or how to get access.";
+				}
 
-                return 'I\'m having trouble connecting to the AI service right now. For questions about CoolAI Engine — its 144x speedup, accuracy metrics, or how to get access — please email Arthourias@gmail.com directly. You can also explore the performance metrics on this page above.';
-            },
+				// Ownership / contact / author questions — check BEFORE generic "project" catch-all
+				if (q.includes('who') || q.includes('own') || q.includes('author') ||
+					q.includes('creat') || q.includes('develop') || q.includes('contact')) {
+					return 'CoolAI Engine was developed by the researcher behind this academic portfolio. For access, licensing, or collaboration inquiries, reach out directly at Arthourias@gmail.com — please mention your academic affiliation or corporate context.';
+				}
+
+				if (q.includes('speed') || q.includes('fast') || q.includes('coolprop') || q.includes('500')) {
+					return 'CoolAI Engine achieves a 500.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step). This makes it ideal for real-time digital twins and optimization loops.';
+				}
+				if (q.includes('accur') || q.includes('mape') || q.includes('r2') || q.includes('fidelit')) {
+					return 'CoolAI maintains exceptional physical accuracy: average MAPE below 0.05%, R² fit exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep.';
+				}
+				if (q.includes('access') || q.includes('license') || q.includes('download') || q.includes('get')) {
+					return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You can receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and the grid training pipelines.';
+				}
+				if (q.includes('python') || q.includes('c++') || q.includes('integrat') || q.includes('batch')) {
+					return 'For C++ direct bindings, you get the full 500× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer you get to the peak speedup. Contact Arthourias@gmail.com for library packages.';
+				}
+				// More specific match — only trigger on explicit CoolAI/what-is questions
+				if (q.includes('coolai') || (q.includes('what') && q.includes('project'))) {
+					return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 500× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
+				}
+
+				return 'I\'m having trouble connecting to the AI service right now. For questions about CoolAI Engine — its 500x speedup, accuracy metrics, or how to get access — please email Arthourias@gmail.com directly. You can also explore the performance metrics on this page above.';
+			},
 
             // ── Helpers ────────────────────────────────────────────────
             sendQuickMessage(text) {
