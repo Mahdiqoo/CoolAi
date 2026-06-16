@@ -14,7 +14,11 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
-    
+    <!-- 2026 Immersive Motion / 3D Stack -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -51,20 +55,619 @@
             }
         }
     </script>
+
     <style>
         [x-cloak] { display: none !important; }
+
+        :root {
+            --mx: 50vw;
+            --my: 50vh;
+            --brand-blue: #2563eb;
+            --brand-teal: #0d9488;
+            --ink: #0f172a;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 10% 0%, rgba(37, 99, 235, 0.08), transparent 32%),
+                radial-gradient(circle at 90% 10%, rgba(13, 148, 136, 0.08), transparent 30%),
+                #f8fafc;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background:
+                radial-gradient(
+                    700px circle at var(--mx) var(--my),
+                    rgba(37, 99, 235, 0.13),
+                    rgba(13, 148, 136, 0.08) 18%,
+                    transparent 46%
+                );
+            mix-blend-mode: multiply;
+            opacity: 0.85;
+        }
+
+        body > *:not(.ambient-scene):not(#scroll-progress):not(#immersive-cursor):not(#cursor-ring):not(#page-loader):not(script) {
+            position: relative;
+            z-index: 2;
+        }
+
         .gradient-bg {
             background: radial-gradient(circle at 10% 20%, rgba(243, 244, 246, 1) 0%, rgba(229, 231, 235, 1) 90%);
         }
+
         .accent-gradient {
-            background: linear-gradient(135deg, #2563eb 0%, #0d9488 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #0d9488 50%, #22d3ee 100%);
+            background-size: 220% 220%;
+            animation: gradientShift 7s ease infinite;
         }
+
         .glow-hover:hover {
-            box-shadow: 0 20px 40px -15px rgba(37, 99, 235, 0.15);
+            box-shadow:
+                0 24px 70px -25px rgba(37, 99, 235, 0.35),
+                0 0 45px rgba(13, 148, 136, 0.14);
+        }
+
+        /* ========================= */
+        /* Immersive Background      */
+        /* ========================= */
+
+        .ambient-scene {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #quantum-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.7;
+        }
+
+        .aurora {
+            position: absolute;
+            width: 42rem;
+            height: 42rem;
+            border-radius: 999px;
+            filter: blur(90px);
+            opacity: 0.34;
+            animation: auroraFloat 18s ease-in-out infinite alternate;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .aurora-1 {
+            top: -14rem;
+            left: -10rem;
+            background: rgba(37, 99, 235, 0.32);
+        }
+
+        .aurora-2 {
+            right: -14rem;
+            top: 12rem;
+            background: rgba(13, 148, 136, 0.28);
+            animation-delay: -4s;
+        }
+
+        .aurora-3 {
+            left: 28%;
+            bottom: -18rem;
+            background: rgba(59, 130, 246, 0.22);
+            animation-delay: -9s;
+        }
+
+        .depth-grid {
+            position: absolute;
+            inset: -20%;
+            opacity: 0.22;
+            background-image:
+                linear-gradient(rgba(37, 99, 235, 0.13) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(13, 148, 136, 0.13) 1px, transparent 1px);
+            background-size: 64px 64px;
+            transform: perspective(900px) rotateX(67deg) translateY(-18%);
+            transform-origin: top;
+            animation: gridFlow 20s linear infinite;
+            mask-image: linear-gradient(to bottom, transparent, black 16%, black 58%, transparent);
+        }
+
+        .noise-layer {
+            position: absolute;
+            inset: 0;
+            opacity: 0.035;
+            background-image:
+                radial-gradient(circle at 25% 25%, #000 1px, transparent 1px),
+                radial-gradient(circle at 75% 75%, #000 1px, transparent 1px);
+            background-size: 18px 18px;
+            mix-blend-mode: multiply;
+        }
+
+        /* ========================= */
+        /* Loader / Scroll / Cursor  */
+        /* ========================= */
+
+        #page-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.18), transparent 35%),
+                #020617;
+            transition: opacity 0.75s ease, visibility 0.75s ease;
+        }
+
+        body.loaded #page-loader {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader-core {
+            width: 120px;
+            height: 120px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            position: relative;
+            display: grid;
+            place-items: center;
+            color: white;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            animation: loaderPulse 1.8s ease-in-out infinite;
+        }
+
+        .loader-core::before,
+        .loader-core::after {
+            content: "";
+            position: absolute;
+            inset: -14px;
+            border-radius: inherit;
+            border: 1px solid transparent;
+            border-top-color: rgba(34, 211, 238, 0.85);
+            border-right-color: rgba(37, 99, 235, 0.85);
+            animation: spin3d 1.5s linear infinite;
+        }
+
+        .loader-core::after {
+            inset: -28px;
+            animation-duration: 2.4s;
+            animation-direction: reverse;
+            opacity: 0.55;
+        }
+
+        #scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            transform: scaleX(0);
+            transform-origin: left;
+            z-index: 99999;
+            background: linear-gradient(90deg, #2563eb, #0d9488, #22d3ee);
+            box-shadow: 0 0 22px rgba(37, 99, 235, 0.5);
+        }
+
+        #immersive-cursor,
+        #cursor-ring {
+            display: none;
+        }
+
+        @media (pointer: fine) {
+            #immersive-cursor,
+            #cursor-ring {
+                display: block;
+                position: fixed;
+                pointer-events: none;
+                z-index: 99998;
+                border-radius: 999px;
+                transform: translate(-50%, -50%);
+            }
+
+            #immersive-cursor {
+                width: 8px;
+                height: 8px;
+                background: #2563eb;
+                box-shadow: 0 0 22px rgba(37, 99, 235, 0.85);
+            }
+
+            #cursor-ring {
+                width: 38px;
+                height: 38px;
+                border: 1px solid rgba(37, 99, 235, 0.45);
+                transition:
+                    width 0.22s ease,
+                    height 0.22s ease,
+                    border-color 0.22s ease,
+                    background 0.22s ease;
+            }
+
+            body.cursor-active #cursor-ring {
+                width: 64px;
+                height: 64px;
+                border-color: rgba(13, 148, 136, 0.55);
+                background: rgba(37, 99, 235, 0.06);
+            }
+        }
+
+        /* ========================= */
+        /* 3D Cards / Holograms      */
+        /* ========================= */
+
+        .tilt-card {
+            transform-style: preserve-3d;
+            will-change: transform;
+            transition:
+                transform 0.25s ease,
+                box-shadow 0.25s ease,
+                border-color 0.25s ease;
+        }
+
+        .tilt-card:hover {
+            box-shadow:
+                0 34px 90px -34px rgba(15, 23, 42, 0.38),
+                0 0 55px rgba(37, 99, 235, 0.16);
+        }
+
+        .holographic-panel {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+        }
+
+        .holographic-panel::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            z-index: -1;
+            border-radius: inherit;
+            background:
+                conic-gradient(
+                    from 180deg,
+                    transparent,
+                    rgba(37, 99, 235, 0.3),
+                    rgba(13, 148, 136, 0.3),
+                    transparent,
+                    rgba(34, 211, 238, 0.22),
+                    transparent
+                );
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            animation: holoSpin 7s linear infinite;
+        }
+
+        .holographic-panel::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            background:
+                radial-gradient(
+                    420px circle at var(--glare-x, 50%) var(--glare-y, 50%),
+                    rgba(255, 255, 255, 0.5),
+                    rgba(37, 99, 235, 0.08) 28%,
+                    transparent 55%
+                );
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            mix-blend-mode: soft-light;
+        }
+
+        .holographic-panel:hover::before {
+            opacity: 1;
+        }
+
+        .holographic-panel:hover::after {
+            opacity: 1;
+        }
+
+        .depth-card > * {
+            transform: translateZ(18px);
+        }
+
+        .glass-2026 {
+            background: rgba(255, 255, 255, 0.72) !important;
+            backdrop-filter: blur(22px) saturate(1.25);
+            -webkit-backdrop-filter: blur(22px) saturate(1.25);
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.72) !important;
+            backdrop-filter: blur(24px) saturate(1.3);
+            -webkit-backdrop-filter: blur(24px) saturate(1.3);
+        }
+
+        section {
+            isolation: isolate;
+        }
+
+        section.bg-white {
+            background: rgba(255, 255, 255, 0.76) !important;
+            backdrop-filter: blur(8px);
+        }
+
+        section.bg-slate-100\/50 {
+            background: rgba(241, 245, 249, 0.68) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        /* ========================= */
+        /* Hero Visual Effects       */
+        /* ========================= */
+
+        .immersive-hero {
+            background:
+                linear-gradient(to bottom, rgba(255,255,255,0.88), rgba(248,250,252,0.7)),
+                radial-gradient(circle at 70% 24%, rgba(37,99,235,0.12), transparent 36%),
+                radial-gradient(circle at 20% 70%, rgba(13,148,136,0.1), transparent 34%) !important;
+        }
+
+        .kinetic-title .text-transparent {
+            background-size: 240% 240%;
+            animation: gradientShift 5s ease infinite;
+        }
+
+        .neural-badge {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .neural-badge::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 46px;
+            left: -60px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
+            transform: skewX(-24deg);
+            animation: shimmer 3.4s ease-in-out infinite;
+        }
+
+        .hero-float-3d {
+            animation: float3d 7s ease-in-out infinite;
+            transform-style: preserve-3d;
+        }
+
+        .reactor-core {
+            position: absolute;
+            inset: auto auto -42px -42px;
+            width: 180px;
+            height: 180px;
+            border-radius: 999px;
+            background:
+                radial-gradient(circle, rgba(34,211,238,0.2), transparent 62%),
+                conic-gradient(from 90deg, rgba(37,99,235,0.35), rgba(13,148,136,0.35), rgba(37,99,235,0.35));
+            filter: blur(0.2px);
+            opacity: 0.78;
+            animation: spin3d 9s linear infinite;
+        }
+
+        .reactor-core::before,
+        .reactor-core::after {
+            content: "";
+            position: absolute;
+            inset: 22px;
+            border-radius: inherit;
+            border: 1px solid rgba(37,99,235,0.35);
+            transform: rotateX(62deg);
+        }
+
+        .reactor-core::after {
+            transform: rotateY(64deg);
+            border-color: rgba(13,148,136,0.35);
+        }
+
+        .data-rail {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.18;
+            background-image:
+                linear-gradient(90deg, transparent 0 42%, rgba(37,99,235,0.45) 45%, transparent 50%),
+                linear-gradient(0deg, transparent 0 66%, rgba(13,148,136,0.35) 68%, transparent 72%);
+            background-size: 160px 160px;
+            animation: dataRail 11s linear infinite;
+            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+        }
+
+        .quantum-chip {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quantum-chip::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+            transform: translateX(-100%);
+            animation: chipSweep 3.2s ease-in-out infinite;
+        }
+
+        .bar-fill {
+            transform-origin: left;
+            animation: growBar 1.8s cubic-bezier(.2,.9,.2,1) both;
+        }
+
+        /* ========================= */
+        /* Scroll Reveal             */
+        /* ========================= */
+
+        [data-reveal] {
+            opacity: 0;
+            transform: translate3d(0, 34px, 0) rotateX(8deg);
+            filter: blur(12px);
+            transition:
+                opacity 0.9s ease,
+                transform 0.9s cubic-bezier(.2,.9,.2,1),
+                filter 0.9s ease;
+            transition-delay: var(--reveal-delay, 0s);
+        }
+
+        [data-reveal].is-visible {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) rotateX(0);
+            filter: blur(0);
+        }
+
+        .magnetic {
+            will-change: transform;
+        }
+
+        /* ========================= */
+        /* Animated Underlines / Nav */
+        /* ========================= */
+
+        nav a:not(:last-child) {
+            position: relative;
+        }
+
+        nav a:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: -8px;
+            width: 100%;
+            height: 2px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #2563eb, #0d9488);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
+        }
+
+        nav a:not(:last-child):hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* ========================= */
+        /* Keyframes                 */
+        /* ========================= */
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        @keyframes auroraFloat {
+            0% { transform: translate3d(0, 0, 0) scale(1); }
+            50% { transform: translate3d(6vw, 4vh, 0) scale(1.12); }
+            100% { transform: translate3d(-3vw, 7vh, 0) scale(0.94); }
+        }
+
+        @keyframes gridFlow {
+            from { background-position: 0 0; }
+            to { background-position: 0 256px; }
+        }
+
+        @keyframes shimmer {
+            0%, 35% { left: -70px; }
+            60%, 100% { left: calc(100% + 70px); }
+        }
+
+        @keyframes holoSpin {
+            from { transform: rotate(0deg) scale(1.03); }
+            to { transform: rotate(360deg) scale(1.03); }
+        }
+
+        @keyframes float3d {
+            0%, 100% { transform: translateY(0) rotateX(0deg) rotateY(0deg); }
+            50% { transform: translateY(-16px) rotateX(2deg) rotateY(-2deg); }
+        }
+
+        @keyframes spin3d {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes dataRail {
+            from { background-position: 0 0; }
+            to { background-position: 320px -320px; }
+        }
+
+        @keyframes chipSweep {
+            0%, 35% { transform: translateX(-100%); }
+            65%, 100% { transform: translateX(100%); }
+        }
+
+        @keyframes growBar {
+            from { transform: scaleX(0); }
+            to { transform: scaleX(1); }
+        }
+
+        @keyframes loaderPulse {
+            0%, 100% {
+                box-shadow:
+                    0 0 0 rgba(37,99,235,0),
+                    inset 0 0 22px rgba(34,211,238,0.12);
+            }
+            50% {
+                box-shadow:
+                    0 0 52px rgba(37,99,235,0.5),
+                    inset 0 0 34px rgba(34,211,238,0.26);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.001ms !important;
+            }
+
+            #quantum-canvas,
+            .aurora,
+            .depth-grid,
+            #immersive-cursor,
+            #cursor-ring {
+                display: none !important;
+            }
+
+            [data-reveal] {
+                opacity: 1 !important;
+                transform: none !important;
+                filter: none !important;
+            }
         }
     </style>
 </head>
 <body class="bg-slate-50 text-brand-950 font-sans antialiased selection:bg-brand-100">
+
+    <!-- 2026 Immersive Ambient Scene -->
+    <div class="ambient-scene" aria-hidden="true">
+        <canvas id="quantum-canvas"></canvas>
+        <div class="aurora aurora-1"></div>
+        <div class="aurora aurora-2"></div>
+        <div class="aurora aurora-3"></div>
+        <div class="depth-grid"></div>
+        <div class="noise-layer"></div>
+    </div>
+
+    <div id="scroll-progress" aria-hidden="true"></div>
+    <div id="immersive-cursor" aria-hidden="true"></div>
+    <div id="cursor-ring" aria-hidden="true"></div>
+
+    <div id="page-loader" aria-hidden="true">
+        <div class="loader-core">Ω</div>
+    </div>
 
     <!-- Header Navigation -->
     <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80">
@@ -84,22 +687,22 @@
     </header>
 
     <!-- Hero Section -->
-    <section class="relative overflow-hidden pt-12 pb-24 lg:pt-20 lg:pb-32 bg-gradient-to-b from-white to-slate-50">
+    <section class="immersive-hero relative overflow-hidden pt-12 pb-24 lg:pt-20 lg:pb-32 bg-gradient-to-b from-white to-slate-50">
         <div class="absolute top-0 right-0 -translate-y-12 translate-x-12 w-[500px] h-[500px] rounded-full bg-brand-100 blur-[120px] opacity-70 pointer-events-none"></div>
         <div class="absolute bottom-0 left-0 translate-y-24 -translate-x-12 w-[400px] h-[400px] rounded-full bg-emerald-50 blur-[100px] opacity-70 pointer-events-none"></div>
 
         <div class="max-w-7xl mx-auto px-6 relative">
             <div class="grid lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-7 space-y-8">
-                    <div class="inline-flex items-center space-x-2 bg-brand-50 border border-brand-100 rounded-full px-4 py-1.5 text-xs font-semibold text-brand-700 uppercase tracking-wide">
+                    <div class="neural-badge inline-flex items-center space-x-2 bg-brand-50 border border-brand-100 rounded-full px-4 py-1.5 text-xs font-semibold text-brand-700 uppercase tracking-wide">
                         <span class="w-2 h-2 rounded-full bg-brand-600 animate-pulse"></span>
                         <span>Active Academic Research</span>
                     </div>
-                    
-                    <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight text-brand-950 leading-[1.1]">
+
+                    <h1 class="kinetic-title text-5xl lg:text-7xl font-extrabold tracking-tight text-brand-950 leading-[1.1]">
                         Deep Learning for <span class="font-serif italic font-normal bg-gradient-to-r from-brand-600 to-tealAccent-500 bg-clip-text text-transparent">Ultra-Fast</span> Thermodynamics
                     </h1>
-                    
+
                     <p class="text-lg lg:text-xl text-slate-600 leading-relaxed max-w-2xl">
                         Bridging the gap between high-fidelity physical simulation and real-time execution. Introducing deep neural surrogate architectures built to replace legacy numerical solvers with absolute precision.
                     </p>
@@ -115,42 +718,56 @@
                 </div>
 
                 <div class="lg:col-span-5 relative">
-                    <div class="relative bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl shadow-slate-200/50 animate-float">
-                        <div class="absolute -top-4 -right-4 bg-tealAccent-500 text-white font-bold px-4 py-2 rounded-2xl shadow-lg transform rotate-6 hover:rotate-0 transition-transform">
+                    <div class="reactor-core"></div>
+
+                    <div class="hero-float-3d relative">
+                        <div class="absolute -top-4 -right-4 bg-tealAccent-500 text-white font-bold px-4 py-2 rounded-2xl shadow-lg transform rotate-6 hover:rotate-0 transition-transform z-20">
                             144.04× Faster
                         </div>
-                        
-                        <div class="space-y-6">
-                            <div class="flex items-center space-x-4">
-                                <div class="p-3 bg-brand-50 rounded-2xl text-brand-600">
-                                    <i data-lucide="zap" class="w-6 h-6"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-slate-900">CoolAI Engine Baseline</h4>
-                                    <p class="text-xs text-slate-500">Thermodynamic Sweep: 20,000 runs</p>
-                                </div>
-                            </div>
 
-                            <hr class="border-slate-100">
+                        <div class="tilt-card holographic-panel depth-card glass-2026 relative bg-white border border-slate-200/80 rounded-3xl p-8 shadow-2xl shadow-slate-200/50">
+                            <div class="data-rail"></div>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="p-4 bg-slate-50 rounded-2xl">
-                                    <span class="text-xs text-slate-500 block mb-1">Legacy CoolProp</span>
-                                    <span class="text-xl font-extrabold text-slate-900">11,322.6 ms</span>
+                            <div class="space-y-6">
+                                <div class="flex items-center space-x-4">
+                                    <div class="p-3 bg-brand-50 rounded-2xl text-brand-600">
+                                        <i data-lucide="zap" class="w-6 h-6"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-900">CoolAI Engine Baseline</h4>
+                                        <p class="text-xs text-slate-500">Thermodynamic Sweep: 20,000 runs</p>
+                                    </div>
                                 </div>
-                                <div class="p-4 bg-brand-50/60 rounded-2xl border border-brand-100">
-                                    <span class="text-xs text-brand-700 block mb-1">CoolAI Engine</span>
-                                    <span class="text-xl font-extrabold text-brand-600">78.6 ms</span>
-                                </div>
-                            </div>
 
-                            <div class="space-y-2">
-                                <div class="flex justify-between text-xs font-semibold">
-                                    <span class="text-slate-600">Physical Fidelity</span>
-                                    <span class="text-tealAccent-500">99.99% Accuracy</span>
+                                <hr class="border-slate-100">
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-4 bg-slate-50 rounded-2xl">
+                                        <span class="text-xs text-slate-500 block mb-1">Legacy CoolProp</span>
+                                        <span class="text-xl font-extrabold text-slate-900"
+                                              data-counter
+                                              data-value="11322.6"
+                                              data-decimals="1"
+                                              data-suffix=" ms">11,322.6 ms</span>
+                                    </div>
+                                    <div class="p-4 bg-brand-50/60 rounded-2xl border border-brand-100">
+                                        <span class="text-xs text-brand-700 block mb-1">CoolAI Engine</span>
+                                        <span class="text-xl font-extrabold text-brand-600"
+                                              data-counter
+                                              data-value="78.6"
+                                              data-decimals="1"
+                                              data-suffix=" ms">78.6 ms</span>
+                                    </div>
                                 </div>
-                                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                    <div class="accent-gradient h-full w-[99.99%]"></div>
+
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-xs font-semibold">
+                                        <span class="text-slate-600">Physical Fidelity</span>
+                                        <span class="text-tealAccent-500">99.99% Accuracy</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                        <div class="accent-gradient bar-fill h-full w-[99.99%]"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -169,9 +786,9 @@
             </div>
 
             <div class="grid md:grid-cols-2 gap-8 items-stretch">
-                
+
                 <!-- Project 1: CoolAI -->
-                <div class="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col glow-hover">
+                <div class="tilt-card holographic-panel depth-card glass-2026 bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col glow-hover">
                     <div class="p-8 md:p-10 flex-grow">
                         <div class="flex justify-between items-start mb-6">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
@@ -189,7 +806,10 @@
 
                         <div class="grid grid-cols-3 gap-4 mb-8">
                             <div class="text-center p-3 bg-slate-50 rounded-2xl">
-                                <span class="block text-2xl font-extrabold text-brand-600">144x</span>
+                                <span class="block text-2xl font-extrabold text-brand-600"
+                                      data-counter
+                                      data-value="144"
+                                      data-suffix="x">144x</span>
                                 <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Speedup</span>
                             </div>
                             <div class="text-center p-3 bg-slate-50 rounded-2xl">
@@ -228,7 +848,7 @@
                 </div>
 
                 <!-- Project 2: Coming Soon -->
-                <div class="bg-white rounded-3xl border border-dashed border-slate-300 overflow-hidden flex flex-col relative group">
+                <div class="tilt-card holographic-panel depth-card glass-2026 bg-white rounded-3xl border border-dashed border-slate-300 overflow-hidden flex flex-col relative group">
                     <div class="absolute inset-0 bg-gradient-to-br from-brand-50/20 to-transparent pointer-events-none"></div>
                     <div class="p-8 md:p-10 flex-grow flex flex-col justify-center items-center text-center">
                         <div class="h-16 w-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -255,7 +875,7 @@
     <section id="about-coolai" class="py-24 bg-white" x-data="{ activeTab: 'performance' }">
         <div class="max-w-7xl mx-auto px-6">
             <div class="grid lg:grid-cols-12 gap-12 items-start">
-                
+
                 <div class="lg:col-span-4 lg:sticky lg:top-28 space-y-6">
                     <div class="inline-flex items-center space-x-2 bg-teal-50 border border-teal-100 rounded-full px-3 py-1 text-xs font-semibold text-tealAccent-600 uppercase">
                         <span>Research Deep-Dive</span>
@@ -266,20 +886,20 @@
                     </p>
 
                     <div class="space-y-2 pt-4">
-                        <button @click="activeTab = 'performance'" 
-                                :class="activeTab === 'performance' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'" 
+                        <button @click="activeTab = 'performance'"
+                                :class="activeTab === 'performance' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'"
                                 class="w-full flex items-center justify-between px-4 py-3 border rounded-xl font-semibold transition-all text-left text-sm">
                             <span>144.04× Compute Acceleration</span>
                             <i data-lucide="chevron-right" class="w-4 h-4"></i>
                         </button>
-                        <button @click="activeTab = 'scientific'" 
-                                :class="activeTab === 'scientific' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'" 
+                        <button @click="activeTab = 'scientific'"
+                                :class="activeTab === 'scientific' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'"
                                 class="w-full flex items-center justify-between px-4 py-3 border rounded-xl font-semibold transition-all text-left text-sm">
                             <span>Academic Consistency &amp; Fidelity</span>
                             <i data-lucide="chevron-right" class="w-4 h-4"></i>
                         </button>
-                        <button @click="activeTab = 'advisory'" 
-                                :class="activeTab === 'advisory' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'" 
+                        <button @click="activeTab = 'advisory'"
+                                :class="activeTab === 'advisory' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-transparent text-slate-600 hover:bg-slate-50'"
                                 class="w-full flex items-center justify-between px-4 py-3 border rounded-xl font-semibold transition-all text-left text-sm">
                             <span>Integration &amp; Overhead Advisory</span>
                             <i data-lucide="chevron-right" class="w-4 h-4"></i>
@@ -287,25 +907,31 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-8 bg-slate-50 rounded-3xl border border-slate-200/80 p-8 md:p-12 min-h-[500px]">
-                    
+                <div class="tilt-card holographic-panel glass-2026 lg:col-span-8 bg-slate-50 rounded-3xl border border-slate-200/80 p-8 md:p-12 min-h-[500px]">
+
                     <!-- Tab 1: Performance -->
                     <div x-show="activeTab === 'performance'" x-transition class="space-y-8">
                         <div>
                             <span class="text-xs text-brand-600 font-bold uppercase tracking-wider">Metric Highlights</span>
                             <h3 class="text-2xl font-bold text-slate-900 mt-1">Throughput Scaling Matrix</h3>
                         </div>
-                        
+
                         <div class="grid sm:grid-cols-2 gap-6">
                             <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                                 <div class="text-slate-500 text-sm mb-1 font-semibold">CoolProp Throughput</div>
-                                <div class="text-3xl font-extrabold text-slate-900">1,766 <span class="text-sm text-slate-400 font-normal">configs/sec</span></div>
+                                <div class="text-3xl font-extrabold text-slate-900">
+                                    <span data-counter data-value="1766" data-suffix=" configs/sec">1,766</span>
+                                    <span class="text-sm text-slate-400 font-normal"> configs/sec</span>
+                                </div>
                                 <p class="text-xs text-slate-400 mt-2">Execution latency capped by physical solver overhead (566.129 µs per step).</p>
                             </div>
-                            
+
                             <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                                 <div class="text-brand-600 text-sm mb-1 font-bold">CoolAI Engine Throughput</div>
-                                <div class="text-3xl font-extrabold text-brand-600">254,425 <span class="text-sm text-brand-400 font-normal">configs/sec</span></div>
+                                <div class="text-3xl font-extrabold text-brand-600">
+                                    <span data-counter data-value="254425">254,425</span>
+                                    <span class="text-sm text-brand-400 font-normal"> configs/sec</span>
+                                </div>
                                 <p class="text-xs text-slate-400 mt-2">Driven by parallel vectorized tensor arrays (3.930 µs execution latency).</p>
                             </div>
                         </div>
@@ -427,10 +1053,10 @@
     <!-- Request Access CTA -->
     <section id="contact" class="py-24 bg-gradient-to-b from-slate-50 to-white relative overflow-hidden">
         <div class="absolute inset-y-0 right-0 w-1/2 bg-brand-50/50 rounded-l-[100px] pointer-events-none"></div>
-        
+
         <div class="max-w-7xl mx-auto px-6 relative">
             <div class="grid lg:grid-cols-12 gap-12 items-center">
-                
+
                 <div class="lg:col-span-6 space-y-6">
                     <div class="inline-flex items-center space-x-2 bg-brand-50 border border-brand-100 rounded-full px-3 py-1 text-xs font-semibold text-brand-700 uppercase">
                         <span>Research Access Portal</span>
@@ -439,7 +1065,7 @@
                     <p class="text-slate-600 text-lg leading-relaxed">
                         To request deep-dive benchmark models, raw source code packages (C++ static libraries / Python bindings), or collaborative research opportunities, please reach out directly.
                     </p>
-                    
+
                     <div class="flex items-center space-x-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm max-w-md">
                         <div class="p-3 bg-brand-50 rounded-xl text-brand-600">
                             <i data-lucide="mail" class="w-6 h-6"></i>
@@ -452,13 +1078,13 @@
                 </div>
 
                 <div class="lg:col-span-6">
-                    <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-xl shadow-slate-100 relative">
+                    <div class="tilt-card holographic-panel depth-card glass-2026 bg-white border border-slate-200 rounded-3xl p-8 shadow-xl shadow-slate-100 relative">
                         <div class="space-y-6">
                             <h3 class="text-xl font-bold text-slate-900">Request Licensing &amp; Source Files</h3>
                             <p class="text-sm text-slate-500 leading-relaxed">
                                 Please mention your academic affiliation or corporate context when requesting. We can provide standard pre-built libraries optimized for target operating system contexts (x86_64, Unix/Windows).
                             </p>
-                            
+
                             <hr class="border-slate-100">
 
                             <div class="space-y-3">
@@ -476,7 +1102,7 @@
                                 </div>
                             </div>
 
-                            <a href="mailto:Arthourias@gmail.com?subject=Inquiry regarding CoolAI Engine access" 
+                            <a href="mailto:Arthourias@gmail.com?subject=Inquiry regarding CoolAI Engine access"
                                class="w-full inline-flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl accent-gradient text-white font-bold transition-all shadow-lg hover:shadow-brand-600/20 hover:-translate-y-0.5">
                                 <i data-lucide="mail" class="w-5 h-5"></i>
                                 <span>Request Package Files</span>
@@ -504,14 +1130,14 @@
         </div>
     </footer>
 
-	<!-- Run Lucide Icons -->
-	<script>
-		document.addEventListener('DOMContentLoaded', function () {
-			if (typeof lucide !== 'undefined') {
-				lucide.createIcons();
-			}
-		});
-	</script>
+    <!-- Run Lucide Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
 
     <!-- ============================================ -->
     <!--  AI Chatbot Widget                           -->
@@ -694,7 +1320,6 @@
             messages: [],
             statusText: 'Ask me about the projects',
 
-            // ── System prompt with full project knowledge ──────────────
             SYSTEM_PROMPT: `You are the AI assistant for the CoolAI Engine project website. You are knowledgeable, professional, and friendly, and you answer questions about the research projects on this portfolio. Always respond conversationally and naturally — if someone says "thanks" or greets you, respond appropriately without forcing CoolAI facts into it.
 
 KEY FACTS:
@@ -740,7 +1365,6 @@ Behavior rules:
 - If someone asks how to get access, direct them to Arthourias@gmail.com
 - Never fabricate features not listed above`,
 
-            // ── Main send handler ──────────────────────────────────────
             async sendMessage() {
                 const text = this.userInput.trim();
                 if (!text || this.isLoading) return;
@@ -751,11 +1375,8 @@ Behavior rules:
                 this.statusText = 'Thinking…';
                 this.$nextTick(() => this.scrollToBottom());
 
-                // ── FIX 1: Handle simple conversational messages locally ──
-                // No need to hit the API for greetings, thanks, etc.
                 const quickReply = this.getQuickConversationalReply(text);
                 if (quickReply) {
-                    // Small artificial delay so it feels natural, not instant
                     await new Promise(resolve => setTimeout(resolve, 600));
                     this.messages.push({ role: 'assistant', content: quickReply });
                     this.isLoading = false;
@@ -766,15 +1387,12 @@ Behavior rules:
 
                 let reply = null;
 
-                // Strategy 1: Pollinations POST (OpenAI-compatible, most reliable)
                 reply = await this.tryPollinationsPost();
 
-                // Strategy 2: Pollinations GET (simpler fallback)
                 if (!reply) {
                     reply = await this.tryPollinationsGet(text);
                 }
 
-                // Final fallback: well-structured rule-based reply
                 if (!reply) {
                     reply = this.buildFallbackReply(text);
                 }
@@ -785,52 +1403,32 @@ Behavior rules:
                 this.$nextTick(() => this.scrollToBottom());
             },
 
-            // ── FIX 1: Quick replies for conversational messages ───────
-            // These are intercepted BEFORE calling any API to avoid
-            // the awkward "I'm having trouble connecting" fallback
-            // for simple social exchanges.
             getQuickConversationalReply(text) {
-                const q = text.toLowerCase().trim()
-                    // strip trailing punctuation for matching
-                    .replace(/[!?.]+$/, '');
+                const q = text.toLowerCase().trim().replace(/[!?.]+$/, '');
 
-                // Thank-you messages
-                const thankPatterns = [
-                    'thanks', 'thank you', 'thx', 'ty', 'cheers',
-                    'appreciate it', 'appreciated', 'many thanks',
-                    'much appreciated', 'thank u', 'tysm'
-                ];
+                const thankPatterns = ['thanks', 'thank you', 'thx', 'ty', 'cheers', 'appreciate it', 'appreciated', 'many thanks', 'much appreciated', 'thank u', 'tysm'];
                 if (thankPatterns.some(p => q === p || q.startsWith(p + ' '))) {
                     return "You're welcome! Feel free to ask if you have any other questions about CoolAI Engine — whether it's about the performance numbers, thermodynamic accuracy, or how to request access to the library.";
                 }
 
-                // Greetings
                 const greetPatterns = ['hi', 'hello', 'hey', 'howdy', 'greetings', 'hiya', 'sup', "what's up", 'yo'];
                 if (greetPatterns.some(p => q === p || q.startsWith(p + ' ') || q.startsWith(p + ','))) {
                     return "Hello! I'm the CoolAI Assistant. I can answer questions about the CoolAI Engine — its 144× speedup over CoolProp, thermodynamic accuracy, integration options (C++ or Python), or how to request access. What would you like to know?";
                 }
 
-                // Positive acknowledgments
-                const ackPatterns = [
-                    'great', 'awesome', 'cool', 'nice', 'perfect', 'got it',
-                    'ok', 'okay', 'alright', 'sounds good', 'understood',
-                    'excellent', 'wonderful', 'amazing', 'fantastic', 'helpful',
-                    'that helps', 'that helped', 'makes sense', 'good to know'
-                ];
+                const ackPatterns = ['great', 'awesome', 'cool', 'nice', 'perfect', 'got it', 'ok', 'okay', 'alright', 'sounds good', 'understood', 'excellent', 'wonderful', 'amazing', 'fantastic', 'helpful', 'that helps', 'that helped', 'makes sense', 'good to know'];
                 if (ackPatterns.some(p => q === p || q.startsWith(p + ' ') || q.startsWith(p + ','))) {
                     return "Glad I could help! Is there anything else you'd like to know about CoolAI Engine? I'm happy to go deeper on the performance metrics, thermodynamic accuracy, or integration options.";
                 }
 
-                // Bye / closing
                 const byePatterns = ['bye', 'goodbye', 'cya', 'see you', 'later', 'take care', 'farewell'];
                 if (byePatterns.some(p => q === p || q.startsWith(p + ' '))) {
                     return "Goodbye! If you ever have more questions about CoolAI Engine or want to request access, feel free to come back or email Arthourias@gmail.com directly. Good luck with your research!";
                 }
 
-                return null; // Not a quick reply — let the API handle it
+                return null;
             },
 
-            // ── Strategy 1: Pollinations POST (OpenAI-compatible) ─────
             async tryPollinationsPost() {
                 try {
                     const controller = new AbortController();
@@ -862,7 +1460,6 @@ Behavior rules:
                 }
             },
 
-            // ── Strategy 2: Pollinations GET ──────────────────────────
             async tryPollinationsGet(lastUserMsg) {
                 try {
                     const history = this.messages.slice(-8, -1)
@@ -894,15 +1491,9 @@ Behavior rules:
                 }
             },
 
-            // ── FIX 2: Improved rule-based fallback ───────────────────
-            // Rules are ordered from MOST SPECIFIC to MOST GENERIC.
-            // Previously "who is the owner of this coolai?" matched
-            // the generic `q.includes('coolai')` branch before hitting
-            // any "owner/who" check. Fixed by putting ownership check first.
             buildFallbackReply(text) {
                 const q = text.toLowerCase();
 
-                // ① Ownership / creator — must come BEFORE generic CoolAI check
                 if (
                     q.includes('who') || q.includes('owner') || q.includes('creator') ||
                     q.includes('author') || q.includes('developer') || q.includes('researcher') ||
@@ -912,7 +1503,6 @@ Behavior rules:
                     return 'CoolAI Engine was created by Arthourias, an academic researcher specializing in deep learning for thermodynamic simulation. For collaboration, licensing, or access inquiries, reach out directly at Arthourias@gmail.com.';
                 }
 
-                // ② Speed / performance
                 if (
                     q.includes('speed') || q.includes('fast') || q.includes('slow') ||
                     q.includes('coolprop') || q.includes('144') || q.includes('throughput') ||
@@ -922,7 +1512,6 @@ Behavior rules:
                     return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step) — ideal for real-time digital twins and optimization loops.';
                 }
 
-                // ③ Accuracy / fidelity
                 if (
                     q.includes('accur') || q.includes('mape') || q.includes('r2') ||
                     q.includes('r²') || q.includes('fidelit') || q.includes('error') ||
@@ -932,7 +1521,6 @@ Behavior rules:
                     return 'CoolAI maintains exceptional physical fidelity: average MAPE below 0.05%, R² exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep. First Law residual error is just 1.30 × 10⁻¹⁴%.';
                 }
 
-                // ④ Access / licensing
                 if (
                     q.includes('access') || q.includes('license') || q.includes('download') ||
                     q.includes('request') || q.includes('purchase') || q.includes('buy') ||
@@ -942,7 +1530,6 @@ Behavior rules:
                     return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You\'ll receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and grid training pipelines with hyperparameter keys.';
                 }
 
-                // ⑤ Integration / Python / C++ / installation
                 if (
                     q.includes('python') || q.includes('c++') || q.includes('integrat') ||
                     q.includes('batch') || q.includes('api') || q.includes('library') ||
@@ -952,7 +1539,6 @@ Behavior rules:
                     return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer to peak speedup. Email Arthourias@gmail.com for library packages (.a / .lib + NumPy wrapper).';
                 }
 
-                // ⑥ Water / fluid / phase / Rankine
                 if (
                     q.includes('water') || q.includes('phase') || q.includes('rankine') ||
                     q.includes('fluid') || q.includes('steam') || q.includes('subcritical') ||
@@ -961,7 +1547,6 @@ Behavior rules:
                     return 'CoolAI Engine supports complete Single & Two-Phase water thermodynamics, validated across a 20,000-coordinate subcritical/supercritical parameter grid. It\'s purpose-built for Rankine cycle simulations, digital twins, and fluid-flow optimization pipelines.';
                 }
 
-                // ⑦ Next project / coming soon / future
                 if (
                     q.includes('next') || q.includes('future') || q.includes('coming') ||
                     q.includes('soon') || q.includes('organic') || q.includes('rankine')
@@ -969,7 +1554,6 @@ Behavior rules:
                     return 'The next research project is currently under development. It will expand CoolAI\'s neural surrogate approach into more complex fluid structures and organic Rankine cycle dynamics. Stay tuned by checking back or contacting Arthourias@gmail.com.';
                 }
 
-                // ⑧ Generic "what is CoolAI" — kept LAST to avoid swallowing other queries
                 if (
                     q.includes('what is') || q.includes('coolai') || q.includes('project') ||
                     q.includes('tell me') || q.includes('explain') || q.includes('about') ||
@@ -978,11 +1562,9 @@ Behavior rules:
                     return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 144× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
                 }
 
-                // ⑨ Catch-all — useful and non-embarrassing
                 return 'I specialize in questions about the CoolAI Engine project. You can ask me about its 144× speedup over CoolProp, thermodynamic accuracy, C++/Python integration, or how to request access. Alternatively, email Arthourias@gmail.com directly for any inquiries.';
             },
 
-            // ── Helpers ────────────────────────────────────────────────
             sendQuickMessage(text) {
                 this.userInput = text;
                 this.sendMessage();
@@ -1000,6 +1582,475 @@ Behavior rules:
             }
         };
     }
+    </script>
+
+    <!-- ============================================ -->
+    <!--  2026 Immersive Animation Engine             -->
+    <!-- ============================================ -->
+    <script>
+    (function () {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const pointerFine = window.matchMedia('(pointer: fine)').matches;
+
+        /* ========================= */
+        /* Loader                    */
+        /* ========================= */
+
+        const finishLoading = () => {
+            document.body.classList.add('loaded');
+        };
+
+        window.addEventListener('load', () => {
+            setTimeout(finishLoading, 450);
+        });
+
+        setTimeout(finishLoading, 1400);
+
+        /* ========================= */
+        /* Mouse Aura / Cursor       */
+        /* ========================= */
+
+        const cursor = document.getElementById('immersive-cursor');
+        const ring = document.getElementById('cursor-ring');
+
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let ringX = mouseX;
+        let ringY = mouseY;
+
+        window.addEventListener('pointermove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+
+            document.documentElement.style.setProperty('--mx', mouseX + 'px');
+            document.documentElement.style.setProperty('--my', mouseY + 'px');
+
+            if (cursor && pointerFine) {
+                cursor.style.left = mouseX + 'px';
+                cursor.style.top = mouseY + 'px';
+            }
+        }, { passive: true });
+
+        function animateCursorRing() {
+            if (!ring || !pointerFine) return;
+
+            ringX += (mouseX - ringX) * 0.18;
+            ringY += (mouseY - ringY) * 0.18;
+
+            ring.style.left = ringX + 'px';
+            ring.style.top = ringY + 'px';
+
+            requestAnimationFrame(animateCursorRing);
+        }
+
+        animateCursorRing();
+
+        document.querySelectorAll('a, button, input, .tilt-card').forEach((el) => {
+            el.addEventListener('pointerenter', () => document.body.classList.add('cursor-active'));
+            el.addEventListener('pointerleave', () => document.body.classList.remove('cursor-active'));
+        });
+
+        /* ========================= */
+        /* Scroll Progress           */
+        /* ========================= */
+
+        const progress = document.getElementById('scroll-progress');
+
+        function updateScrollProgress() {
+            if (!progress) return;
+            const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+            const progressValue = scrollable <= 0 ? 0 : window.scrollY / scrollable;
+            progress.style.transform = `scaleX(${progressValue})`;
+        }
+
+        window.addEventListener('scroll', updateScrollProgress, { passive: true });
+        window.addEventListener('resize', updateScrollProgress);
+        updateScrollProgress();
+
+        /* ========================= */
+        /* Automatic Reveal Effects  */
+        /* ========================= */
+
+        const revealTargets = document.querySelectorAll(`
+            section h1,
+            section h2,
+            section h3,
+            section p,
+            section li,
+            section .rounded-3xl,
+            section .inline-flex,
+            section a,
+            footer > div
+        `);
+
+        revealTargets.forEach((el, index) => {
+            if (el.closest('#ai-chatbot')) return;
+            el.setAttribute('data-reveal', '');
+            el.style.setProperty('--reveal-delay', `${Math.min((index % 8) * 0.055, 0.38)}s`);
+        });
+
+        if (!reduceMotion && window.gsap && window.ScrollTrigger) {
+            gsap.registerPlugin(ScrollTrigger);
+
+            document.querySelectorAll('[data-reveal]').forEach((el) => {
+                gsap.to(el, {
+                    opacity: 1,
+                    y: 0,
+                    rotateX: 0,
+                    filter: 'blur(0px)',
+                    duration: 0.9,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: el,
+                        start: 'top 88%',
+                        once: true
+                    }
+                });
+            });
+
+            gsap.fromTo('header',
+                { y: -24, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out', delay: 0.2 }
+            );
+
+            gsap.to('.aurora-1', {
+                xPercent: 8,
+                yPercent: 4,
+                scrollTrigger: {
+                    trigger: document.body,
+                    start: 'top top',
+                    end: 'bottom bottom',
+                    scrub: 1.4
+                }
+            });
+
+            gsap.to('.aurora-2', {
+                xPercent: -8,
+                yPercent: 8,
+                scrollTrigger: {
+                    trigger: document.body,
+                    start: 'top top',
+                    end: 'bottom bottom',
+                    scrub: 1.4
+                }
+            });
+        } else {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12 });
+
+            document.querySelectorAll('[data-reveal]').forEach((el) => observer.observe(el));
+        }
+
+        /* ========================= */
+        /* 3D Tilt Cards             */
+        /* ========================= */
+
+        if (!reduceMotion && pointerFine) {
+            document.querySelectorAll('.tilt-card').forEach((card) => {
+                let frame = null;
+
+                card.addEventListener('pointermove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / rect.width;
+                    const y = (e.clientY - rect.top) / rect.height;
+
+                    const rotateY = (x - 0.5) * 13;
+                    const rotateX = (0.5 - y) * 13;
+
+                    card.style.setProperty('--glare-x', `${x * 100}%`);
+                    card.style.setProperty('--glare-y', `${y * 100}%`);
+
+                    if (frame) cancelAnimationFrame(frame);
+
+                    frame = requestAnimationFrame(() => {
+                        card.style.transform = `
+                            perspective(1200px)
+                            rotateX(${rotateX}deg)
+                            rotateY(${rotateY}deg)
+                            translate3d(0, -6px, 32px)
+                        `;
+                    });
+                });
+
+                card.addEventListener('pointerleave', () => {
+                    if (frame) cancelAnimationFrame(frame);
+                    card.style.transform = `
+                        perspective(1200px)
+                        rotateX(0deg)
+                        rotateY(0deg)
+                        translate3d(0, 0, 0)
+                    `;
+                });
+            });
+        }
+
+        /* ========================= */
+        /* Magnetic Buttons          */
+        /* ========================= */
+
+        if (!reduceMotion && pointerFine) {
+            document.querySelectorAll('a, button').forEach((el) => {
+                if (el.closest('#ai-chatbot')) return;
+
+                el.classList.add('magnetic');
+
+                el.addEventListener('pointermove', (e) => {
+                    const rect = el.getBoundingClientRect();
+                    const x = e.clientX - rect.left - rect.width / 2;
+                    const y = e.clientY - rect.top - rect.height / 2;
+                    el.style.transform = `translate(${x * 0.14}px, ${y * 0.18}px)`;
+                });
+
+                el.addEventListener('pointerleave', () => {
+                    el.style.transform = '';
+                });
+            });
+        }
+
+        /* ========================= */
+        /* Animated Counters         */
+        /* ========================= */
+
+        function animateNumber(el) {
+            if (el.dataset.animated === 'true') return;
+            el.dataset.animated = 'true';
+
+            const value = Number(el.dataset.value || '0');
+            const prefix = el.dataset.prefix || '';
+            const suffix = el.dataset.suffix || '';
+            const decimals = Number(el.dataset.decimals || '0');
+            const duration = Number(el.dataset.duration || '1600');
+            const start = performance.now();
+
+            function tick(now) {
+                const progress = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                const current = value * eased;
+
+                el.textContent = prefix + current.toLocaleString(undefined, {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals
+                }) + suffix;
+
+                if (progress < 1) {
+                    requestAnimationFrame(tick);
+                }
+            }
+
+            requestAnimationFrame(tick);
+        }
+
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    animateNumber(entry.target);
+                    counterObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.45 });
+
+        document.querySelectorAll('[data-counter]').forEach((el) => {
+            counterObserver.observe(el);
+        });
+
+        /* ========================= */
+        /* Three.js Quantum Field    */
+        /* ========================= */
+
+        function initQuantumField() {
+            if (reduceMotion || !window.THREE) return;
+
+            const canvas = document.getElementById('quantum-canvas');
+            if (!canvas) return;
+
+            const scene = new THREE.Scene();
+
+            const camera = new THREE.PerspectiveCamera(
+                62,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+
+            camera.position.z = 72;
+
+            const renderer = new THREE.WebGLRenderer({
+                canvas,
+                alpha: true,
+                antialias: true,
+                powerPreference: 'high-performance'
+            });
+
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            const group = new THREE.Group();
+            scene.add(group);
+
+            const isMobile = window.innerWidth < 768;
+            const particleCount = isMobile ? 420 : 1150;
+
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            const colorA = new THREE.Color('#2563eb');
+            const colorB = new THREE.Color('#0d9488');
+            const colorC = new THREE.Color('#22d3ee');
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                const radius = 18 + Math.random() * 62;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+
+                positions[i3]     = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                positions[i3 + 2] = radius * Math.cos(phi) - 25;
+
+                const mix = Math.random();
+                const color = mix < 0.4 ? colorA : mix < 0.75 ? colorB : colorC;
+
+                colors[i3]     = color.r;
+                colors[i3 + 1] = color.g;
+                colors[i3 + 2] = color.b;
+            }
+
+            const particlesGeometry = new THREE.BufferGeometry();
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: isMobile ? 0.18 : 0.22,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.78,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            group.add(particles);
+
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: 0x2563eb,
+                transparent: true,
+                opacity: 0.18,
+                wireframe: true,
+                blending: THREE.AdditiveBlending
+            });
+
+            const tealRingMaterial = new THREE.MeshBasicMaterial({
+                color: 0x0d9488,
+                transparent: true,
+                opacity: 0.16,
+                wireframe: true,
+                blending: THREE.AdditiveBlending
+            });
+
+            const torusOne = new THREE.Mesh(
+                new THREE.TorusGeometry(18, 0.16, 12, 160),
+                ringMaterial
+            );
+            torusOne.position.set(24, -2, -34);
+            torusOne.rotation.x = Math.PI / 2.8;
+            group.add(torusOne);
+
+            const torusTwo = new THREE.Mesh(
+                new THREE.TorusGeometry(28, 0.1, 10, 180),
+                tealRingMaterial
+            );
+            torusTwo.position.set(-28, 10, -42);
+            torusTwo.rotation.y = Math.PI / 2.2;
+            group.add(torusTwo);
+
+            const core = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(6, 2),
+                new THREE.MeshBasicMaterial({
+                    color: 0x2563eb,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.22,
+                    blending: THREE.AdditiveBlending
+                })
+            );
+            core.position.set(-18, 4, -28);
+            group.add(core);
+
+            const lineCount = isMobile ? 70 : 160;
+            const linePositions = new Float32Array(lineCount * 6);
+
+            for (let i = 0; i < lineCount; i++) {
+                const a = Math.floor(Math.random() * particleCount) * 3;
+                const b = Math.floor(Math.random() * particleCount) * 3;
+
+                linePositions[i * 6]     = positions[a];
+                linePositions[i * 6 + 1] = positions[a + 1];
+                linePositions[i * 6 + 2] = positions[a + 2];
+                linePositions[i * 6 + 3] = positions[b];
+                linePositions[i * 6 + 4] = positions[b + 1];
+                linePositions[i * 6 + 5] = positions[b + 2];
+            }
+
+            const linesGeometry = new THREE.BufferGeometry();
+            linesGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+
+            const lines = new THREE.LineSegments(
+                linesGeometry,
+                new THREE.LineBasicMaterial({
+                    color: 0x38bdf8,
+                    transparent: true,
+                    opacity: 0.06,
+                    blending: THREE.AdditiveBlending
+                })
+            );
+            group.add(lines);
+
+            const clock = new THREE.Clock();
+
+            function animate() {
+                const t = clock.getElapsedTime();
+
+                group.rotation.y = t * 0.025 + ((mouseX / window.innerWidth) - 0.5) * 0.18;
+                group.rotation.x = ((mouseY / window.innerHeight) - 0.5) * 0.12;
+
+                particles.rotation.z = t * 0.008;
+
+                torusOne.rotation.z = t * 0.38;
+                torusOne.rotation.x = Math.PI / 2.8 + Math.sin(t * 0.45) * 0.18;
+
+                torusTwo.rotation.z = -t * 0.26;
+                torusTwo.rotation.y = Math.PI / 2.2 + Math.cos(t * 0.4) * 0.18;
+
+                core.rotation.x = t * 0.35;
+                core.rotation.y = t * 0.28;
+
+                camera.position.x += (((mouseX / window.innerWidth) - 0.5) * 9 - camera.position.x) * 0.025;
+                camera.position.y += (-((mouseY / window.innerHeight) - 0.5) * 7 - camera.position.y) * 0.025;
+                camera.lookAt(0, 0, 0);
+
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        initQuantumField();
+
+    })();
     </script>
 
 </body>
