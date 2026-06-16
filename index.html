@@ -694,9 +694,14 @@
             messages: [],
             statusText: 'Ask me about the projects',
 
-            SYSTEM_PROMPT: `You are the AI assistant for the CoolAI Engine project website. You are knowledgeable, professional, and friendly, and you answer questions about the research projects on this portfolio.
+            // ── System prompt with full project knowledge ──────────────
+            SYSTEM_PROMPT: `You are the AI assistant for the CoolAI Engine project website. You are knowledgeable, professional, and friendly, and you answer questions about the research projects on this portfolio. Always respond conversationally and naturally — if someone says "thanks" or greets you, respond appropriately without forcing CoolAI facts into it.
 
 KEY FACTS:
+
+OWNER / RESEARCHER:
+- CoolAI Engine was created and developed by Arthourias, an academic researcher specializing in deep learning for thermodynamic simulation
+- Contact email: Arthourias@gmail.com
 
 CoolAI Engine (Stable Release v1.0):
 - A deep learning alternative to CoolProp for thermodynamic state computation
@@ -714,9 +719,9 @@ CoolAI Engine (Stable Release v1.0):
 
 Integration Options:
 - Option A (Recommended): C++ Direct Bindings — full 144x acceleration at any batch size
-- Option B: Python Wrapper — use batch arrays for best performance
+- Option B: Python Wrapper — use batch arrays for best performance; larger batches approach peak speedup
 - Available as compiled C++ library (.a / .lib) and Python NumPy interface wrapper
-- Grid training pipelines and hyperparameter keys available
+- Grid training pipelines and hyperparameter keys available on request
 
 Next Research Project (Coming Soon):
 - Expanding into complex fluid structures and organic Rankine dynamics
@@ -727,12 +732,12 @@ Contact / Access:
 - License key required
 
 Behavior rules:
-- Stay on topic about CoolAI and thermodynamic simulation
-- Be concise but informative (2-4 sentences typically)
-- If asked about unrelated topics, politely redirect to CoolAI
-- Use a professional yet approachable tone
-- Reference specific numbers and metrics from the project when relevant
-- If someone asks how to get access, tell them to email Arthourias@gmail.com
+- Respond naturally and conversationally. "Thanks" gets a warm acknowledgment. "Hello" gets a greeting.
+- Stay on topic about CoolAI and thermodynamic simulation for substantive questions
+- Be concise but informative (2-4 sentences typically for technical questions)
+- If asked about unrelated topics, politely note you specialize in CoolAI and redirect
+- Reference specific numbers and metrics when relevant
+- If someone asks how to get access, direct them to Arthourias@gmail.com
 - Never fabricate features not listed above`,
 
             // ── Main send handler ──────────────────────────────────────
@@ -746,22 +751,30 @@ Behavior rules:
                 this.statusText = 'Thinking…';
                 this.$nextTick(() => this.scrollToBottom());
 
+                // ── FIX 1: Handle simple conversational messages locally ──
+                // No need to hit the API for greetings, thanks, etc.
+                const quickReply = this.getQuickConversationalReply(text);
+                if (quickReply) {
+                    // Small artificial delay so it feels natural, not instant
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                    this.messages.push({ role: 'assistant', content: quickReply });
+                    this.isLoading = false;
+                    this.statusText = 'Ask me about the projects';
+                    this.$nextTick(() => this.scrollToBottom());
+                    return;
+                }
+
                 let reply = null;
 
-                // Strategy 1: Pollinations POST (OpenAI-compatible)
+                // Strategy 1: Pollinations POST (OpenAI-compatible, most reliable)
                 reply = await this.tryPollinationsPost();
 
-                // Strategy 2: Pollinations GET (simpler, CORS-friendly)
+                // Strategy 2: Pollinations GET (simpler fallback)
                 if (!reply) {
                     reply = await this.tryPollinationsGet(text);
                 }
 
-                // Strategy 3: Llamafile/Mistral via HuggingFace Inference (free, no key)
-                if (!reply) {
-                    reply = await this.tryHuggingFace(text);
-                }
-
-                // Final fallback: helpful static response
+                // Final fallback: well-structured rule-based reply
                 if (!reply) {
                     reply = this.buildFallbackReply(text);
                 }
@@ -772,43 +785,86 @@ Behavior rules:
                 this.$nextTick(() => this.scrollToBottom());
             },
 
-			// ── Strategy 1: Pollinations POST (OpenAI-compatible) ─────
-			async tryPollinationsPost() {
-				try {
-					const controller = new AbortController();
-					const timer = setTimeout(() => controller.abort(), 15000);
+            // ── FIX 1: Quick replies for conversational messages ───────
+            // These are intercepted BEFORE calling any API to avoid
+            // the awkward "I'm having trouble connecting" fallback
+            // for simple social exchanges.
+            getQuickConversationalReply(text) {
+                const q = text.toLowerCase().trim()
+                    // strip trailing punctuation for matching
+                    .replace(/[!?.]+$/, '');
 
-					const res = await fetch('https://text.pollinations.ai/openai', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							messages: [
-								{ role: 'system', content: this.SYSTEM_PROMPT },
-								...this.messages
-							],
-							model: 'openai',
-							private: true,
-							seed: Math.floor(Math.random() * 99999)
-						}),
-						signal: controller.signal
-					});
+                // Thank-you messages
+                const thankPatterns = [
+                    'thanks', 'thank you', 'thx', 'ty', 'cheers',
+                    'appreciate it', 'appreciated', 'many thanks',
+                    'much appreciated', 'thank u', 'tysm'
+                ];
+                if (thankPatterns.some(p => q === p || q.startsWith(p + ' '))) {
+                    return "You're welcome! Feel free to ask if you have any other questions about CoolAI Engine — whether it's about the performance numbers, thermodynamic accuracy, or how to request access to the library.";
+                }
 
-					clearTimeout(timer);
-					if (!res.ok) return null;
+                // Greetings
+                const greetPatterns = ['hi', 'hello', 'hey', 'howdy', 'greetings', 'hiya', 'sup', "what's up", 'yo'];
+                if (greetPatterns.some(p => q === p || q.startsWith(p + ' ') || q.startsWith(p + ','))) {
+                    return "Hello! I'm the CoolAI Assistant. I can answer questions about the CoolAI Engine — its 144× speedup over CoolProp, thermodynamic accuracy, integration options (C++ or Python), or how to request access. What would you like to know?";
+                }
 
-					// /openai returns JSON in OpenAI format, not plain text
-					const data = await res.json();
-					const text = data?.choices?.[0]?.message?.content?.trim();
-					return text && text.length > 5 ? text : null;
-				} catch {
-					return null;
-				}
-			},
+                // Positive acknowledgments
+                const ackPatterns = [
+                    'great', 'awesome', 'cool', 'nice', 'perfect', 'got it',
+                    'ok', 'okay', 'alright', 'sounds good', 'understood',
+                    'excellent', 'wonderful', 'amazing', 'fantastic', 'helpful',
+                    'that helps', 'that helped', 'makes sense', 'good to know'
+                ];
+                if (ackPatterns.some(p => q === p || q.startsWith(p + ' ') || q.startsWith(p + ','))) {
+                    return "Glad I could help! Is there anything else you'd like to know about CoolAI Engine? I'm happy to go deeper on the performance metrics, thermodynamic accuracy, or integration options.";
+                }
+
+                // Bye / closing
+                const byePatterns = ['bye', 'goodbye', 'cya', 'see you', 'later', 'take care', 'farewell'];
+                if (byePatterns.some(p => q === p || q.startsWith(p + ' '))) {
+                    return "Goodbye! If you ever have more questions about CoolAI Engine or want to request access, feel free to come back or email Arthourias@gmail.com directly. Good luck with your research!";
+                }
+
+                return null; // Not a quick reply — let the API handle it
+            },
+
+            // ── Strategy 1: Pollinations POST (OpenAI-compatible) ─────
+            async tryPollinationsPost() {
+                try {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 15000);
+
+                    const res = await fetch('https://text.pollinations.ai/openai', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: [
+                                { role: 'system', content: this.SYSTEM_PROMPT },
+                                ...this.messages
+                            ],
+                            model: 'openai',
+                            private: true,
+                            seed: Math.floor(Math.random() * 99999)
+                        }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timer);
+                    if (!res.ok) return null;
+
+                    const data = await res.json();
+                    const text = data?.choices?.[0]?.message?.content?.trim();
+                    return (text && text.length > 5) ? text : null;
+                } catch {
+                    return null;
+                }
+            },
 
             // ── Strategy 2: Pollinations GET ──────────────────────────
             async tryPollinationsGet(lastUserMsg) {
                 try {
-                    // Build a compact conversation string for context
                     const history = this.messages.slice(-8, -1)
                         .map(m => (m.role === 'user' ? 'User' : 'Assistant') + ': ' + m.content)
                         .join('\n');
@@ -838,70 +894,92 @@ Behavior rules:
                 }
             },
 
-            // ── Strategy 3: HuggingFace Inference API (no key needed for public models) ──
-            async tryHuggingFace(lastUserMsg) {
-                try {
-                    const history = this.messages.slice(-6, -1)
-                        .map(m => (m.role === 'user' ? 'User' : 'Assistant') + ': ' + m.content)
-                        .join('\n');
-
-                    const fullPrompt = `<s>[INST] ${this.SYSTEM_PROMPT}\n\n${history ? history + '\n' : ''}User: ${lastUserMsg} [/INST]`;
-
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 15000);
-
-                    const res = await fetch(
-                        'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                inputs: fullPrompt,
-                                parameters: {
-                                    max_new_tokens: 300,
-                                    temperature: 0.7,
-                                    return_full_text: false
-                                }
-                            }),
-                            signal: controller.signal
-                        }
-                    );
-
-                    clearTimeout(timer);
-                    if (!res.ok) return null;
-
-                    const data = await res.json();
-                    if (Array.isArray(data) && data[0]?.generated_text) {
-                        const text = data[0].generated_text.trim();
-                        return text.length > 5 ? text : null;
-                    }
-                    return null;
-                } catch {
-                    return null;
-                }
-            },
-
-            // ── Fallback: keyword-based static replies ─────────────────
+            // ── FIX 2: Improved rule-based fallback ───────────────────
+            // Rules are ordered from MOST SPECIFIC to MOST GENERIC.
+            // Previously "who is the owner of this coolai?" matched
+            // the generic `q.includes('coolai')` branch before hitting
+            // any "owner/who" check. Fixed by putting ownership check first.
             buildFallbackReply(text) {
                 const q = text.toLowerCase();
 
-                if (q.includes('speed') || q.includes('fast') || q.includes('coolprop') || q.includes('144')) {
-                    return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step). This makes it ideal for real-time digital twins and optimization loops.';
+                // ① Ownership / creator — must come BEFORE generic CoolAI check
+                if (
+                    q.includes('who') || q.includes('owner') || q.includes('creator') ||
+                    q.includes('author') || q.includes('developer') || q.includes('researcher') ||
+                    q.includes('arthourias') || q.includes('who made') || q.includes('who built') ||
+                    q.includes('who created') || q.includes('who is behind')
+                ) {
+                    return 'CoolAI Engine was created by Arthourias, an academic researcher specializing in deep learning for thermodynamic simulation. For collaboration, licensing, or access inquiries, reach out directly at Arthourias@gmail.com.';
                 }
-                if (q.includes('accur') || q.includes('mape') || q.includes('r2') || q.includes('fidelit')) {
-                    return 'CoolAI maintains exceptional physical accuracy: average MAPE below 0.05%, R² fit exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep.';
+
+                // ② Speed / performance
+                if (
+                    q.includes('speed') || q.includes('fast') || q.includes('slow') ||
+                    q.includes('coolprop') || q.includes('144') || q.includes('throughput') ||
+                    q.includes('latency') || q.includes('performance') || q.includes('benchmark') ||
+                    q.includes('comparison') || q.includes('vs') || q.includes('versus')
+                ) {
+                    return 'CoolAI Engine achieves a 144.04× speedup over CoolProp C++. CoolAI processes 254,425 configs/sec (3.93 µs per step) versus CoolProp\'s 1,766 configs/sec (566 µs per step) — ideal for real-time digital twins and optimization loops.';
                 }
-                if (q.includes('access') || q.includes('license') || q.includes('download') || q.includes('get')) {
-                    return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You can receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and the grid training pipelines.';
+
+                // ③ Accuracy / fidelity
+                if (
+                    q.includes('accur') || q.includes('mape') || q.includes('r2') ||
+                    q.includes('r²') || q.includes('fidelit') || q.includes('error') ||
+                    q.includes('precis') || q.includes('law') || q.includes('entropy') ||
+                    q.includes('violation') || q.includes('drift') || q.includes('exact')
+                ) {
+                    return 'CoolAI maintains exceptional physical fidelity: average MAPE below 0.05%, R² exceeding 0.9999, and zero violations of the First or Second Law of Thermodynamics across the entire 20,000-point grid sweep. First Law residual error is just 1.30 × 10⁻¹⁴%.';
                 }
-                if (q.includes('python') || q.includes('c++') || q.includes('integrat') || q.includes('batch')) {
-                    return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer you get to the peak speedup. Contact Arthourias@gmail.com for library packages.';
+
+                // ④ Access / licensing
+                if (
+                    q.includes('access') || q.includes('license') || q.includes('download') ||
+                    q.includes('request') || q.includes('purchase') || q.includes('buy') ||
+                    q.includes('price') || q.includes('cost') || q.includes('how do i get') ||
+                    q.includes('how to get') || q.includes('obtain') || q.includes('email')
+                ) {
+                    return 'To request access to CoolAI Engine, email Arthourias@gmail.com and mention your academic affiliation or corporate context. You\'ll receive a compiled C++ library (.a/.lib), a Python NumPy wrapper, and grid training pipelines with hyperparameter keys.';
                 }
-                if (q.includes('what is') || q.includes('coolai') || q.includes('project')) {
+
+                // ⑤ Integration / Python / C++ / installation
+                if (
+                    q.includes('python') || q.includes('c++') || q.includes('integrat') ||
+                    q.includes('batch') || q.includes('api') || q.includes('library') ||
+                    q.includes('install') || q.includes('wrapper') || q.includes('binding') ||
+                    q.includes('numpy') || q.includes('how to use')
+                ) {
+                    return 'For C++ direct bindings, you get the full 144× speedup at any batch size. For Python, use batch arrays rather than single-evaluation loops — the larger the batch, the closer to peak speedup. Email Arthourias@gmail.com for library packages (.a / .lib + NumPy wrapper).';
+                }
+
+                // ⑥ Water / fluid / phase / Rankine
+                if (
+                    q.includes('water') || q.includes('phase') || q.includes('rankine') ||
+                    q.includes('fluid') || q.includes('steam') || q.includes('subcritical') ||
+                    q.includes('supercritical') || q.includes('thermodynamic') || q.includes('heat')
+                ) {
+                    return 'CoolAI Engine supports complete Single & Two-Phase water thermodynamics, validated across a 20,000-coordinate subcritical/supercritical parameter grid. It\'s purpose-built for Rankine cycle simulations, digital twins, and fluid-flow optimization pipelines.';
+                }
+
+                // ⑦ Next project / coming soon / future
+                if (
+                    q.includes('next') || q.includes('future') || q.includes('coming') ||
+                    q.includes('soon') || q.includes('organic') || q.includes('rankine')
+                ) {
+                    return 'The next research project is currently under development. It will expand CoolAI\'s neural surrogate approach into more complex fluid structures and organic Rankine cycle dynamics. Stay tuned by checking back or contacting Arthourias@gmail.com.';
+                }
+
+                // ⑧ Generic "what is CoolAI" — kept LAST to avoid swallowing other queries
+                if (
+                    q.includes('what is') || q.includes('coolai') || q.includes('project') ||
+                    q.includes('tell me') || q.includes('explain') || q.includes('about') ||
+                    q.includes('describe') || q.includes('overview')
+                ) {
                     return 'CoolAI Engine is a deep learning surrogate that replaces traditional thermodynamic property libraries like CoolProp. It delivers 144× faster computation with less than 0.05% error and zero thermodynamic law violations — perfect for Rankine cycle simulations, digital twins, and fluid-flow optimization.';
                 }
 
-                return 'I\'m having trouble connecting to the AI service right now. For questions about CoolAI Engine — its 144x speedup, accuracy metrics, or how to get access — please email Arthourias@gmail.com directly. You can also explore the performance metrics on this page above.';
+                // ⑨ Catch-all — useful and non-embarrassing
+                return 'I specialize in questions about the CoolAI Engine project. You can ask me about its 144× speedup over CoolProp, thermodynamic accuracy, C++/Python integration, or how to request access. Alternatively, email Arthourias@gmail.com directly for any inquiries.';
             },
 
             // ── Helpers ────────────────────────────────────────────────
